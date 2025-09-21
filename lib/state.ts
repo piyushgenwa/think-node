@@ -18,6 +18,7 @@ interface GraphStoreState {
   toggleHidden: (nodeId: string) => void;
   setSelectedNode: (nodeId?: string) => void;
   setInspectorOpen: (open: boolean) => void;
+  setNodePosition: (nodeId: string, position: { x: number; y: number }) => void;
 }
 
 let idCounter = 0;
@@ -96,9 +97,19 @@ export const useGraphStore = create<GraphStoreState>((set) => ({
       if (!state.graph) return state;
       const currentGraph = state.graph;
       const now = new Date().toISOString();
-      const nodes = [...currentGraph.nodes];
-      const edges = [...currentGraph.edges];
-      let totalQuestions = nodes.filter((node) => node.type === 'question' && node.depth === 1).length;
+      const existingRoot = currentGraph.nodes.find(
+        (node) => node.id === currentGraph.rootId && node.type === 'topic'
+      ) as TopicNode | undefined;
+      if (!existingRoot) return state;
+
+      const rootNode: TopicNode = {
+        ...existingRoot,
+        updatedAt: now
+      };
+
+      const nodes: GraphNode[] = [rootNode];
+      const edges = [] as Graph['edges'];
+      let totalQuestions = 0;
       themes.forEach((theme) => {
         theme.questions.forEach((question, index) => {
           if (totalQuestions >= 10) return;
@@ -114,12 +125,12 @@ export const useGraphStore = create<GraphStoreState>((set) => ({
             author: 'ai',
             framing: theme.theme,
             priority: totalQuestions + index + 1,
-            parentId: currentGraph.rootId
+            parentId: rootNode.id
           };
           nodes.push(node);
           edges.push({
             id: nextId('edge'),
-            sourceId: currentGraph.rootId,
+            sourceId: rootNode.id,
             targetId: id,
             relation: 'expands'
           });
@@ -131,11 +142,16 @@ export const useGraphStore = create<GraphStoreState>((set) => ({
         nodes,
         edges
       };
-      const positions = { ...state.positions };
-      layoutChildren(graph, positions, currentGraph.rootId);
+      const rootPosition = state.positions[rootNode.id] ?? { x: 0, y: 0 };
+      const positions: Record<string, { x: number; y: number }> = {
+        [rootNode.id]: rootPosition
+      };
+      layoutChildren(graph, positions, rootNode.id);
       return {
         graph,
-        positions
+        positions,
+        selectedNodeId: rootNode.id,
+        inspectorOpen: true
       };
     });
   },
@@ -334,5 +350,20 @@ export const useGraphStore = create<GraphStoreState>((set) => ({
   },
   setInspectorOpen: (open: boolean) => {
     set({ inspectorOpen: open });
+  },
+  setNodePosition: (nodeId: string, position: { x: number; y: number }) => {
+    set((state) => {
+      if (!state.graph) return state;
+      const exists = state.graph.nodes.some((node) => node.id === nodeId);
+      if (!exists) {
+        return state;
+      }
+      return {
+        positions: {
+          ...state.positions,
+          [nodeId]: { x: position.x, y: position.y }
+        }
+      };
+    });
   }
 }));

@@ -35,6 +35,7 @@ export function GraphCanvas({ onExpand, expandLoadingId }: GraphCanvasProps) {
   const positions = useGraphStore((state) => state.positions);
   const setSelectedNode = useGraphStore((state) => state.setSelectedNode);
   const setInspectorOpen = useGraphStore((state) => state.setInspectorOpen);
+  const setNodePosition = useGraphStore((state) => state.setNodePosition);
 
   const nodes: FlowNode<NodeData>[] = useMemo(() => {
     if (!graph) return [];
@@ -128,6 +129,11 @@ export function GraphCanvas({ onExpand, expandLoadingId }: GraphCanvasProps) {
           setSelectedNode(first?.id);
           if (first) {
             setInspectorOpen(true);
+          }
+        }}
+        onNodeDragStop={(_, node) => {
+          if (node?.id && node?.position) {
+            setNodePosition(node.id, node.position);
           }
         }}
         panOnScroll
